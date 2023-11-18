@@ -19,3 +19,7 @@ final class CleanFullButtonEvent extends ButtonEvent {
 final class EqualButtonEvent extends ButtonEvent {
   EqualButtonEvent({required String value}) : super(value: value);
 }
+
+final class CalcScietificButtonEvent extends ButtonEvent {
+  CalcScietificButtonEvent() : super(value: "");
+}

@@ -3,50 +3,116 @@ import 'package:flutter/material.dart';
 import 'package:function_tree/function_tree.dart';
 import 'package:math_expressions/math_expressions.dart';
 
+import 'dart:math' as math;
+
 class CalcController extends ChangeNotifier {
-  String display = "0";
+  String oldExpression = "";
+  String expression = "0";
+  int _amountColumnGrid = 4;
 
-  void calc(ButtonEvent event) {
-    final displayLength = display.length;
+  late final Map<String, String Function(String char)> _mapReplaceSignal = {
+    "π": (char) => char.replaceAll("π", "pi"),
+    "x": (char) => char.replaceAll("x", "*"),
+    "÷": (char) => char.replaceAll("÷", "/"),
+    "√": _replaceSignalSquare
+  };
+
+  int get amountColumnGrid => _amountColumnGrid;
+
+  void onButtonClick(ButtonEvent event) {
     if (event is CleanFullButtonEvent) {
-      display = "0";
+      _cleanFullExpression();
     } else if (event is CleanButtonEvent) {
-      if (displayLength == 1) {
-        display = "0";
-      } else {
-        final lastIndex = displayLength - 1;
-        display = display.replaceFirst(display[lastIndex], "", lastIndex);
-      }
+      _cleanExpression();
     } else if (event is EqualButtonEvent) {
-      try {
-        final exp = _orderExp(display);
-        final value = exp
-            .interpret()
-            .toString()
-            .trim()
-            .replaceFirst(RegExp(r".0"), "", displayLength - 2);
-
-        display = value;
-      } catch (e) {
-        display = "ERROR";
-      }
-    } else {
-      if (event.value == ".") {
-        display += event.value;
-      } else if (display == "0" || display == "ERROR") {
-        display = "";
-        display += event.value;
-      } else {
-        display += event.value;
-      }
+      _calcExpression();
+    } else if (event is CommonButtonEvent) {
+      _addExpression(event.value);
+    } else if (event is CalcScietificButtonEvent) {
+      _amountColumnGrid = _amountColumnGrid == 4 ? 5 : 4;
     }
 
     notifyListeners();
   }
 
-  String _orderExp(String expCalc) {
+  String _expParser(String expCalc) {
     Parser p = Parser();
-    Expression exp = p.parse(expCalc);
+    Expression exp = p.parse(expCalc).simplify();
     return exp.toString();
+  }
+
+  void _calcExpression() {
+    try {
+      expression = _replaceSignalCharButton(expression);
+      oldExpression = "$expression =";
+      var exp = _expParser(expression);
+
+      print("exp: $exp");
+      var value = exp.trim().interpret().toString();
+
+      if (value.endsWith(".0")) {
+        final startIndex = value.length - 2;
+        value = int.parse(value.replaceFirst(RegExp(r".0"), "", startIndex))
+            .toStringAsFixed(8);
+      }
+      if (expression.contains(value)) return;
+      expression = value;
+    } catch (_) {
+      expression = "ERROR";
+    }
+  }
+
+  void _addExpression(String value) {
+    if (value == ".") {
+      expression += value;
+      return;
+    }
+    if (expression == "0" || expression == "ERROR") {
+      expression = "";
+      expression += value;
+      return;
+    }
+    expression += value;
+  }
+
+  void _cleanFullExpression() {
+    if (!expression.contains("ERROR")) {
+      oldExpression = "Ans = $expression";
+    }
+
+    expression = "0";
+  }
+
+  void _cleanExpression() {
+    if (expression.length == 1) {
+      expression = "0";
+      return;
+    }
+    final lastIndex = expression.length - 1;
+
+    expression = expression.replaceFirst(expression[lastIndex], "", lastIndex);
+  }
+
+  String _replaceSignalCharButton(
+    String char,
+  ) {
+    for (var key in _mapReplaceSignal.keys) {
+      if (char.contains(key)) {
+        char = _mapReplaceSignal[key]!(char);
+      }
+    }
+    return char;
+  }
+
+  String _replaceSignalSquare(String char) {
+    final raiz = int.parse(
+        RegExp(r"√.[0-9]+|√.[0-9]").stringMatch(char)?.replaceAll("√", "") ??
+            "0");
+    final number = int.parse(
+        RegExp(r"[0-9]+.+√|[0-9].√").stringMatch(char)?.replaceAll("√", "") ??
+            "1");
+    print("raiz: $raiz");
+    print("number: $number");
+    return char.replaceAll(RegExp(r"√|.+√"), "${(number * math.sqrt(raiz))}");
   }
 }
